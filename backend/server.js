@@ -179,6 +179,8 @@ app.post("/api/extract", async (req, res) => {
     (error, stdout) => {
       if (error) {
         console.error("Extraction failed:", error.message);
+        console.error("yt-dlp stderr:", error.stderr?.toString());
+        console.error("yt-dlp stdout:", error.stdout?.toString());
 
         return res.status(422).json({
           success: false,
