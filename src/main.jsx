@@ -22,7 +22,9 @@ function App() {
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
+const [menuOpen, setMenuOpen] = useState(false);
+const [videoData, setVideoData] = useState(null);
+const [selectedFormat, setSelectedFormat] = useState('');
 
  const pasteFromClipboard = async () => {
   try {
@@ -66,7 +68,7 @@ const handleAnalyze = async (event) => {
     setMessage('Please enter a valid link starting with https://');
     return;
   }
-
+  setVideoData(null);
   setStatus('loading');
   setMessage('Checking your link...');
 
@@ -108,16 +110,14 @@ const handleAnalyze = async (event) => {
 
       const video = result.video;
 
-      setStatus('success');
-      setMessage(
-        `Title: ${video.title}\n` +
-        `Platform: ${result.platform}\n` +
-        `Duration: ${Math.floor(video.duration / 60)} minutes\n` +
-        `Uploader: ${video.uploader || 'Unknown'}\n` +
-        `Available formats: ${video.formats.map(f => f.quality).join(', ') || 'Not available'}`
-      );
+setVideoData(video);
+setSelectedFormat(video.formats?.[0]?.quality || '');
+setStatus('success');
+setMessage('');
 
-      return;
+return;
+
+    
     }
 
     // Other platforms: detection only for now
@@ -202,9 +202,56 @@ const handleAnalyze = async (event) => {
             {message && (
               <div className={`feedback ${status === 'error' ? 'feedback-error' : 'feedback-info'}`} role="status">
                 {status === 'error' ? <CircleHelp size={17} /> : <Check size={17} />}
-                <span>{message}</span>
+              {videoData && (
+  <div className="video-result">
+    <div className="video-result-preview">
+      {videoData.thumbnail && (
+        <img src={videoData.thumbnail} alt={videoData.title} />
+      )}
+      <span className="video-platform">Dailymotion</span>
+    </div>
+
+    <div className="video-result-details">
+      <h3>{videoData.title}</h3>
+
+      <div className="video-result-meta">
+        <span>
+          <Clock3 size={15} />
+          {Math.floor(videoData.duration / 60)} minutes
+        </span>
+        <span>{videoData.uploader || 'Unknown uploader'}</span>
+      </div>
+
+      <label htmlFor="video-quality">Video quality</label>
+
+      <select
+        id="video-quality"
+        value={selectedFormat}
+        onChange={e => setSelectedFormat(e.target.value)}
+      >
+        {videoData.formats?.map((format, index) => (
+          <option
+            key={`${format.quality}-${index}`}
+            value={format.quality}
+          >
+            {format.quality} · {format.format.toUpperCase()}
+          </option>
+        ))}
+      </select>
+
+      <button
+        type="button"
+        disabled
+        className="result-download-button"
+      >
+        Download — coming soon
+      </button>
+    </div>
+  </div>
+)}  <span>{message}</span>
               </div>
             )}
+              
             <div className="card-footnote"><ShieldCheck size={14} /> We only process content you’re authorized to download.</div>
           </div>
           <div className="hero-bottom-note"><span className="mini-line" /> Built for the way you save <span className="mini-line" /></div>
