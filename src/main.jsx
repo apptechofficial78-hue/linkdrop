@@ -14,6 +14,8 @@ const platforms = [
   { name: 'Instagram', mark: '◎', color: '#d94c9b' },
   { name: 'Vimeo', mark: 'v', color: '#2798e8' },
   { name: 'X / Twitter', mark: '𝕏', color: '#171717' },
+  { name: 'Dailymotion', mark: '▶', color: '#00aaff' },
+  { name: 'DramaFren', mark: 'D', color: '#7655d8' },
 ];
 
 function App() {
@@ -22,47 +24,114 @@ function App() {
   const [message, setMessage] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleAnalyze = (event) => {
-    event?.preventDefault();
-    if (!url.trim()) {
-      setStatus('error');
-      setMessage('Paste a media link first to get started.');
-      return;
-    }
-    try {
-      const parsed = new URL(url.trim());
-      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Invalid protocol');
-    } catch {
-      setStatus('error');
-      setMessage('That link does not look right. Please enter a full URL starting with https://');
-      return;
-    }
-    setStatus('demo');
-    setMessage('Your interface is ready. Connect the media API to analyze this link and show real download options.');
-  };
-
-  const pasteFromClipboard = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        setUrl(text);
-        setStatus('idle');
-        setMessage('');
-      } else {
-        setMessage('Your clipboard looks empty. Copy a link, then paste it here.');
-        setStatus('error');
-      }
-    } catch {
-      setMessage('Clipboard access was blocked by your browser. Paste the link into the field instead.');
-      setStatus('error');
-    }
-  };
-
-  const clearUrl = () => {
-    setUrl('');
+ const pasteFromClipboard = async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    setUrl(text);
     setStatus('idle');
     setMessage('');
-  };
+  } catch (error) {
+    setStatus('error');
+    setMessage('Unable to access clipboard. Please paste your link manually.');
+  }
+
+};
+
+const clearUrl = () => {
+  setUrl('');
+  setStatus('idle');
+  setMessage('');
+};
+
+
+const handleAnalyze = async (event) => {
+  event?.preventDefault();
+
+  if (!url.trim()) {
+    setStatus('error');
+    setMessage('Paste a media link first to get started.');
+    return;
+  }
+
+  let parsed;
+
+  try {
+    parsed = new URL(url.trim());
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      throw new Error('Invalid protocol');
+    }
+  } catch {
+    setStatus('error');
+    setMessage('Please enter a valid link starting with https://');
+    return;
+  }
+
+  setStatus('loading');
+  setMessage('Checking your link...');
+
+  try {
+    const apiUrl = 'https://linkdrop-api-m6eg.onrender.com';
+
+    // Detect the platform
+    const infoResponse = await fetch(`${apiUrl}/api/info`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ url: parsed.toString() })
+    });
+
+    const info = await infoResponse.json();
+
+    if (!infoResponse.ok || !info.success) {
+      throw new Error(info.error || 'Unable to analyze this link.');
+    }
+
+    // Extract actual metadata for Dailymotion
+    if (info.platform === 'Dailymotion') {
+      setMessage('Extracting video information...');
+
+      const extractResponse = await fetch(`${apiUrl}/api/extract`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url: parsed.toString() })
+      });
+
+      const result = await extractResponse.json();
+
+      if (!extractResponse.ok || !result.success) {
+        throw new Error(result.error || 'Unable to extract video information.');
+      }
+
+      const video = result.video;
+
+      setStatus('success');
+      setMessage(
+        `Title: ${video.title}\n` +
+        `Platform: ${result.platform}\n` +
+        `Duration: ${Math.floor(video.duration / 60)} minutes\n` +
+        `Uploader: ${video.uploader || 'Unknown'}\n` +
+        `Available formats: ${video.formats.map(f => f.quality).join(', ') || 'Not available'}`
+      );
+
+      return;
+    }
+
+    // Other platforms: detection only for now
+    setStatus('success');
+    setMessage(`Platform detected: ${info.platform}. Metadata extraction is not yet available for this platform.`);
+
+  } catch (error) {
+    setStatus('error');
+    setMessage(
+      error.message || 'Could not connect to LinkDrop. Please try again.'
+    );
+  }
+};
+
 
   return (
     <div className="app-shell">
